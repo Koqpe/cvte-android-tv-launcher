@@ -171,6 +171,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
+        // Место для погоды из adb; сама погода обновится в onStart
+        applyLocationExtras(intent)
         setContentView(buildLayout())
         buildSources()
         reloadApps(keepFocus = false)
@@ -282,8 +284,32 @@ class MainActivity : Activity() {
     /** Нажали Home, уже находясь на главном экране, — возвращаемся к началу. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (applyLocationExtras(intent)) refreshWeather(force = true)
         scroll.smoothScrollTo(0, 0)
         firstAppTile()?.requestFocus()
+    }
+
+    /**
+     * Место для погоды задаётся через adb (по IP часто определяется город провайдера, а не свой):
+     *   adb shell am start -n io.github.darkknightsoul.tvlauncher/.MainActivity --es city "Город" --ef lat 49.5 --ef lon 72.8
+     * Вернуть определение по IP:
+     *   adb shell am start -n io.github.darkknightsoul.tvlauncher/.MainActivity --ez auto_location true
+     * Возвращает true, если место изменилось.
+     */
+    private fun applyLocationExtras(intent: Intent?): Boolean {
+        intent ?: return false
+        val weather = Weather(this)
+        if (intent.getBooleanExtra("auto_location", false)) {
+            weather.clearManualLocation()
+            return true
+        }
+        val city = intent.getStringExtra("city") ?: return false
+        if (!intent.hasExtra("lat") || !intent.hasExtra("lon")) return false
+        val lat = intent.getFloatExtra("lat", 0f).toDouble()
+        val lon = intent.getFloatExtra("lon", 0f).toDouble()
+        if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return false
+        weather.setManualLocation(city, lat, lon)
+        return true
     }
 
     @Deprecated("Back на главном экране ничего не делает")

@@ -74,8 +74,23 @@ class Weather(context: Context) {
         null
     }
 
-    /** Город и координаты по IP; кэш на сутки, без сети — последний известный. */
+    /**
+     * Задать место вручную (город и координаты) — тогда город по IP больше не запрашивается.
+     * Задаётся через adb, см. [MainActivity.applyLocationExtras].
+     */
+    fun setManualLocation(city: String, lat: Double, lon: Double) {
+        sp.edit().putString("city", city).putFloat("lat", lat.toFloat()).putFloat("lon", lon.toFloat())
+            .putBoolean("manual", true).putLong("time", 0).apply()
+    }
+
+    /** Вернуться к определению города по IP. */
+    fun clearManualLocation() {
+        sp.edit().remove("manual").putLong("loc_time", 0).putLong("time", 0).apply()
+    }
+
+    /** Город и координаты: заданные вручную, иначе по IP; кэш на сутки, без сети — последний известный. */
     private fun location(): Triple<String, Double, Double>? {
+        if (sp.getBoolean("manual", false) && sp.contains("city")) return savedLocation()
         val fresh = System.currentTimeMillis() - sp.getLong("loc_time", 0) < 24 * 3600_000L
         if (fresh && sp.contains("city")) return savedLocation()
         return try {
